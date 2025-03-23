@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cassandra:
+    image: cassandra:4.0
+    ports:
+      - "9042:9042"
+    healthcheck:
+      test: ["CMD", "cqlsh", "-u cassandra", "-p cassandra", "-e describe keyspaces"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
+  publisher:
+    build: .
+    environment:
+      - RABBIT_HOST=rabbitmq
+    command: python3 publisher.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  consumer1:
+    build: .
+    environment:
+      - RABBIT_HOST=rabbitmq
+      - CASSANDRA_TABLE_NAME=my_table1
+    command: python3 consumer.py
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  consumer2:
+    build: .
+    environment:
+      - RABBIT_HOST=rabbitmq
+      - CASSANDRA_TABLE_NAME=my_table2
+    command: python3 consumer.py
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
